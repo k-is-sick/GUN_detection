@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gun Detection</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: sans-serif; background: #f4f4f4; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+    .card { background: white; border-radius: 12px; padding: 32px; max-width: 480px; width: 100%; box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
+    h1 { font-size: 22px; margin-bottom: 6px; }
+    p.sub { font-size: 14px; color: #666; margin-bottom: 24px; }
+    .upload-area { border: 2px dashed #ccc; border-radius: 8px; padding: 24px; text-align: center; cursor: pointer; margin-bottom: 16px; }
+    .upload-area:hover { border-color: #185FA5; background: #f0f6ff; }
+    #file-input { display: none; }
+    #preview { max-width: 100%; border-radius: 8px; margin-bottom: 16px; display: none; }
+    button { width: 100%; padding: 12px; background: #185FA5; color: white; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; }
+    button:hover { background: #0C447C; }
+    button:disabled { background: #999; cursor: not-allowed; }
+    .result { margin-top: 20px; padding: 16px; border-radius: 8px; text-align: center; display: none; }
+    .result.gun { background: #FCEBEB; border: 1px solid #F7C1C1; }
+    .result.nogun { background: #EAF3DE; border: 1px solid #C0DD97; }
+    .result .label { font-size: 22px; font-weight: 600; }
+    .result .conf { font-size: 14px; color: #555; margin-top: 4px; }
+    #spinner { display: none; text-align: center; margin-top: 16px; color: #555; font-size: 14px; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h1>Gun Detection</h1>
+  <p class="sub">Upload an image to check for weapons</p>
+  <div class="upload-area" onclick="document.getElementById('file-input').click()">
+    <p>Click to upload an image</p>
+    <p style="font-size:12px;color:#999;margin-top:4px">JPG or PNG</p>
+  </div>
+  <input type="file" id="file-input" accept="image/*" onchange="handleFile(event)">
+  <img id="preview">
+  <button id="detect-btn" onclick="detect()" disabled>Detect</button>
+  <div id="spinner">Analysing image...</div>
+  <div class="result" id="result">
+    <div class="label" id="result-label"></div>
+    <div class="conf" id="result-conf"></div>
+  </div>
+</div>
+<script>
+  const API_URL = "YOUR_API_URL";
+  let selectedFile = null;
+
+  function handleFile(e) {
+    selectedFile = e.target.files[0];
+    if (!selectedFile) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const p = document.getElementById('preview');
+      p.src = ev.target.result;
+      p.style.display = 'block';
+    };
+    reader.readAsDataURL(selectedFile);
+    document.getElementById('detect-btn').disabled = false;
+    document.getElementById('result').style.display = 'none';
+  }
+
+  async function detect() {
+    if (!selectedFile) return;
+    document.getElementById('detect-btn').disabled = true;
+    document.getElementById('spinner').style.display = 'block';
+    document.getElementById('result').style.display = 'none';
+    const reader = new FileReader();
+    reader.onload = async ev => {
+      const base64 = ev.target.result.split(',')[1];
+      try {
+        const resp = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: base64 })
+        });
+        const data = await resp.json();
+        const isGun = data.detected === 'gun';
+        const result = document.getElementById('result');
+        result.className = 'result ' + (isGun ? 'gun' : 'nogun');
+        document.getElementById('result-label').textContent = isGun ? 'Gun Detected' : 'No Gun Found';
+        document.getElementById('result-conf').textContent = 'Confidence: ' + data.confidence + '%';
+        result.style.display = 'block';
+      } catch (err) {
+        alert('Error: ' + err.message);
+      } finally {
+        document.getElementById('spinner').style.display = 'none';
+        document.getElementById('detect-btn').disabled = false;
+      }
+    };
+    reader.readAsDataURL(selectedFile);
+  }
+</script>
+</body>
+</html>
